@@ -2,7 +2,7 @@
  * BlackBoxOSV.cpp - library for ENES100 Black Box mission OSV.
  * Designed for Section 0502, Team BASED-MRR.
  * Adapted from "dfr_tank" library.
- * Created by Michael Lum, April 2, 2018.
+ * Created by Michael Lum and Richard Ojo, April 2, 2018.
  */
 
 #include "Arduino.h"
@@ -115,6 +115,8 @@ return true;
 return false;
 
 };
+
+//Forward movement
 void BlackBoxOSV::drive(int pwm) {
   setRightMotorPWM(pwm);
   setLeftMotorPWM(pwm);
