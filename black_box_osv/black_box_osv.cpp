@@ -93,9 +93,6 @@ void BlackBoxOSV::turnRight(int pwm) {
 void BlackBoxOSV::turnOffMotors(){
   setRightMotorPWM(0);
   setLeftMotorPWM(0);
-  _pin_pwm = 0;
-  //_right_motor_pwm = 0;
-  //_left_motor_pwm = 0;
 };
 //Ultrasonic sensor checking/ returns distance is cm
 double BlackBoxOSV::getDistance(){
