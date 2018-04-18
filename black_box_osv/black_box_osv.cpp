@@ -2,7 +2,7 @@
  * BlackBoxOSV.cpp - library for ENES100 Black Box mission OSV.
  * Designed for Section 0502, Team BASED-MRR.
  * Adapted from "dfr_tank" library.
- * Created by Michael Lum, April 2, 2018.
+ * Created by Michael Lum and Richard Ojo, April 2, 2018.
  */
 
 #include "Arduino.h"
@@ -93,9 +93,6 @@ void BlackBoxOSV::turnRight(int pwm) {
 void BlackBoxOSV::turnOffMotors(){
   setRightMotorPWM(0);
   setLeftMotorPWM(0);
-  _pin_pwm = 0;
-  //_right_motor_pwm = 0;
-  //_left_motor_pwm = 0;
 };
 //Ultrasonic sensor checking/ returns distance is cm
 double BlackBoxOSV::getDistance(){
@@ -118,6 +115,8 @@ return true;
 return false;
 
 };
+
+//Forward movement
 void BlackBoxOSV::drive(int pwm) {
   setRightMotorPWM(pwm);
   setLeftMotorPWM(pwm);
