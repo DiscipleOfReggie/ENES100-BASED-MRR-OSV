@@ -1,0 +1,23 @@
+DIGITAL
+0	
+1	
+2	Right motors direction 1
+3	
+4	Right motors direction 2
+5	Servo
+6	Left motors direction 1
+7	Left motors direction 2
+8	RF Rx
+9	RF Tx
+10	Ultrasonic trig
+11	Ultrasonic echo
+12	
+13	IR
+
+ANALOG
+0
+1
+2
+3
+4
+5
