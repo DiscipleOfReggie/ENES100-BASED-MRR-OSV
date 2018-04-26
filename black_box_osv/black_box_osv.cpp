@@ -94,7 +94,7 @@ void BlackBoxOSV::turnOffMotors(){
   setRightMotorPWM(0);
   setLeftMotorPWM(0);
 };
-//Ultrasonic sensor checking/ returns distance in cm
+//Ultrasonic sensor checking/ returns distance is cm
 double BlackBoxOSV::getDistance(){
   digitalWrite(_pin_trig_Pin , LOW);
   delayMicroseconds(2);
@@ -121,4 +121,23 @@ void BlackBoxOSV::drive(int pwm) {
   setRightMotorPWM(pwm);
   setLeftMotorPWM(pwm);
 };
+
+void BlackBoxOSV::driveP(int pwm,int pause) {
+  setRightMotorPWM(pwm);
+  setLeftMotorPWM(pwm);
+  delay(pause);
+  this->turnOffMotors();
+  delay(pause);
+};
+
+bool BlackBoxOSV::obstacle(double distance) {
+	//obstcles distance=23.5cm
+	double od=this->getDistance();
+	if(od==distance){
+		return true;
+	}
+		return false;
+
+};
+
 
