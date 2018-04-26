@@ -17,7 +17,9 @@ class BlackBoxOSV {
     void turnLeft(int pwm);
     void turnRight(int pwm);
     void drive(int pwm);
+	void driveP(int pwm, int pause);
     bool  IRsignal();
+	bool obstacle(double distance);
     double getDistance();
     int getLeftMotorPWM(){
       return _left_motor_pwm;
