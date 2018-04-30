@@ -11,37 +11,49 @@ enum phase {
   phase_6  // RTB
 };
 
-const double landing_zone_x = 1, ;
+const double landing_zone_x = 1.375, thresh = .5, angle_thresh = .2, obstacle_distance = 23.5;
 
-/* Initialize osv pins  
+/* Initialize osv pins
      Parameters:
-       int pin_right_dir1, 
-       int pin_right_dir2, 
-       int pin_left_dir1, 
-       int pin_left_dir2, 
-       int pin_pwm, 
-       int trigPin,
-       int echoPin, 
-       int irPin
+      int pin_right_dir1,
+      int pin_right_dir2,
+      int pin_left_dir1,
+      int pin_left_dir2,
+      int pin_pwm,
+      int trigPin,
+      int echoPin
+      int irPin
 */
 BlackBoxOSV osv(2, 4, 6, 7, 3, 10, 11, 13);
-Enes100 enes("BASED-MRR", BLACK_BOX, 0, 8, 9);
-phase cur_phase;
+Enes100 enes("BASED-MRR", BLACK_BOX, 31, 8, 9);
 Coordinate landing_coordinate, black_box_coordinate;
+phase cur_phase;
+int power;
+bool landing_stored;
 
 void setup() {
   Serial.begin(9600);
-  //osv.init();
+  osv.init();
   cur_phase = phase_0;
+  power = 255;
+  landing_stored = false;
 }
 
 void loop() {
+  int counter = 0;
+
+
+
+  
   //How frequently should we check the IR sensor for a signal?
+  
   //Phases for panic search, default?
+  
   //Navigate to center and back to landing coordinate with same code?
+  
 
-
-  // update current location
+  // update location
+  updateAndPrintLocation();
   
   switch (cur_phase) {
 
@@ -53,13 +65,41 @@ void loop() {
         Moves to: Phase 1
     */
     case phase_0:
+            
       Serial.println("Phase 0");
+      
       //store landing coordinate
-      //rotate to face correct theta for exit
+      while(!landing_stored) {
+        if (updateAndPrintLocation()) {
+          
+          Coordinate coor (enes.location.x, enes.location.y, enes.location.theta);
+          landing_coordinate = coor;
+          landing_stored = true;
+        }
+      }
+      //print landing coordiante
+      enes.print("LANDING COORDINATE STORED: ");
+      enes.print("(");
+      enes.print(landing_coordinate.x);
+      enes.print(", ");
+      enes.print(landing_coordinate.y);
+      enes.print("), Theta = ");
+      enes.println(landing_coordinate.theta);
+
+      //check for obstacle immediately across rocky terrain?
+      
       //move in correct theta, readjusting as necessary until past landing_zone_x
+      while (enes.location.x <= landing_zone_x + thresh) {
+        orient(3.14);
+        //If osv is pointing in reverse direction
+        updateAndPrintLocation();
+        osv.driveP(-power, 1000);
+      }
+
+      //orient to theta 0
+      orient(0);
+      cur_phase = phase_1;
       break;
-
-
 
     /************************************************************************************************/
     /* NAVIGATE TO CENTER OF MISSION AREA
@@ -70,10 +110,6 @@ void loop() {
     case phase_1:
       Serial.println("Phase 1");
       //Update coordinate
-      if (enes.updateLocation()) {
-        printLocation();
-        
-      }
       //If current coordinate not within threahold values compared with center of mission area,
       //If current x coordinate not within threshold value for mission area center
       //turn in correct x direction facing mission area center (+x or -x)
@@ -88,42 +124,55 @@ void loop() {
       //WHERE TO RESET COUNTER?
       //If obstacle counter == 2  (OSV blocked in two directions)
       //go around
+
+
+      while (enes.location.x <= 2.7 + thresh) {
+        //If osv is not at mission area center
+        while (enes.location.theta <= 0 + thresh) {
+          enes.updateLocation();
+          osv.turnRight(power);
+          delay(500);
+        }
+        while (osv.obstacle(obstacle_distance)) {
+          osv.turnRight(power);
+          osv.driveP(power, 500);
+        }
+        osv.driveP(power, 1000);
+        enes.updateLocation();
+      }
+
       break;
-
-
-      
     /************************************************************************************************/
     /* SEARCH FOR BLACK BOX
         Preconditions: OSV at center of mission area
         Postconditions: OSV has either completed X full rotations in search of black box IR signal,
         or has detected the black box IR signal and is facing the source.
+        Notes: This phase concerns dedicated searching immediately following Phase 1.
+        It does not involve the constant IR sensor checks during previous phases.
         Moves to: Phase 3 if successful, Phase INSERT if unsuccessful
     */
     case phase_2:
+            
       Serial.println("Phase 2");
+   
       //rorate in set increments, checking IR sensor at each step
+      while ( 
+      
       //if IR signal found, proceed to phase 3
       //else if two full rotations are completed, proceed to phase INSERT
       break;
-
-
-      
     /************************************************************************************************/
     /* NAVIGATE TO BLACK BOX
         Preconditions: OSV has Line Of Sight (LOS) with black box, as defined by detection of the
         IR signal by the forward-facing IR sensor
         Postconditions: OSV has LOS with black box and is positioned INSERT meters from the
         black box
-        Notes: This phase concerns dedicated searching immediately following Phase 2.
-        It does not involve the constant IR sensor checks during previous phases.
         Moves to: Phase 4
     */
+    
     case phase_3:
       Serial.println("Phase 3");
       break;
-
-
-      
     /************************************************************************************************/
     /* TRANSMIT BLACK BOX COORDINATES
         Preconditions: OSV has LOS with black box and is positioned INSERT meters from the
@@ -131,12 +180,18 @@ void loop() {
         Postconditions: OSV has transmitted coordinates of the black box via RF communication
         Moves to: Phase 5
     */
+
+    
     case phase_4:
       Serial.println("Phase 4");
-      break;
 
+        //Verify LOS via US and IR sensors
+
+        //Approach black box, maintaining heading and adjusting as necessary until within THRESHOLD range as determined by US sensor
+          //if LOS lost, tun slightly in either direction to reacquire
 
       
+      break;
     /************************************************************************************************/
     /* SECURE BLACK BOX
         Preconditions: OSV has LOS with black box, is positioned INSERT meters from the
@@ -144,12 +199,17 @@ void loop() {
         Postconditions: OSV has successfully lifted black box over the sand
         Moves to: Phase 6
     */
+      
     case phase_5:
       Serial.println("Phase 5");
+
+      //turn OSV slightly left to accomodate off-center sensor package
+    
+      //acquire bb with servo-powered arm
+
+      //optional: verify bb picked up with sensors
+    
       break;
-
-
-      
     /************************************************************************************************/
     /* RTB
         Preconditions: OSV has successfully lifted black box over the sand, is holding black box
@@ -160,9 +220,6 @@ void loop() {
     case phase_6:
       Serial.println("Phase 6");
       break;
-
-
-      
     /************************************************************************************************/
     /*
         Preconditions: N/A
@@ -173,18 +230,54 @@ void loop() {
   }
 }
 
-void printLocation() {
-  enes.print("(");
-  enes.print(enes.location.x);
-  enes.print(", ");
-  enes.print(enes.location.y);
-   enes.print("), θ = ");
-  enes.println(enes.location.theta);
-};
-
-bool ir_signal_check() {
+//Updates and prints OSV coordinates
+bool updateAndPrintLocation() {
+  bool success = false;
   
+  if (enes.updateLocation()) {
+    enes.print("(");
+    enes.print(enes.location.x);
+    enes.print(", ");
+    enes.print(enes.location.y);
+    enes.print("), Theta = ");
+    enes.println(enes.location.theta);
+    success = true;
+  } else {
+    enes.println("Location update failed.");
+  }
+  return success;
 };
 
+//Returns true if black box LOS found, sets current phase to 3 (Navigate to black box)
+bool ir_signal_check() {
+  if (osv.IRsignal()){
+    cur_phase = phase_3;
+    return true; 
+  } else {
+    return false;
+  }
+};
 
+//Orients OSV in angle specified by theta
+//-3.14 <= theta <= 3.14
+void orient(double theta){
+  bool success = false;
+ 
+  while (!success) {
+    updateAndPrintLocation();
+    if (enes.location.theta < theta - angle_thresh) {
+      osv.turnLeft(power);
+      delay(100);
+      osv.turnOffMotors();
+      delay(100);
+    } else if (enes.location.theta > theta + angle_thresh) {
+      osv.turnRight(power);
+      delay(100);
+      osv.turnOffMotors();
+      delay(100);
+    } else {
+      success = true;
+    }
+  }
+}
 
