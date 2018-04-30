@@ -25,11 +25,11 @@ const double landing_zone_x = 1.375, thresh = .5, angle_thresh = .2, obstacle_di
       int irPin
 */
 BlackBoxOSV osv(2, 4, 6, 7, 3, 10, 11, 13);
-Enes100 enes("BASED-MRR", BLACK_BOX, 31, 8, 9);
-Coordinate landing_coordinate, black_box_coordinate;
+Enes100 enes("BASED-MRR", BLACK_BOX, 41, 8, 9);
+Coordinate landing_coordinate, black_box_coordinate, mission_center(0,0,0);
 phase cur_phase;
 int power;
-bool landing_stored;
+bool landing_stored, arrived;
 
 void setup() {
   Serial.begin(9600);
@@ -37,20 +37,16 @@ void setup() {
   cur_phase = phase_0;
   power = 255;
   landing_stored = false;
+  arrived = false;
+  
 }
 
 void loop() {
   int counter = 0;
-
-
-
-  
-  //How frequently should we check the IR sensor for a signal?
+  double starting_theta, theta_sum = 0;
   
   //Phases for panic search, default?
-  
-  //Navigate to center and back to landing coordinate with same code?
-  
+ 
 
   // update location
   updateAndPrintLocation();
@@ -66,7 +62,7 @@ void loop() {
     */
     case phase_0:
             
-      Serial.println("Phase 0");
+      enes.println("PHASE 0");
       
       //store landing coordinate
       while(!landing_stored) {
@@ -87,13 +83,14 @@ void loop() {
       enes.println(landing_coordinate.theta);
 
       //check for obstacle immediately across rocky terrain?
-      
+
+      updateAndPrintLocation();
       //move in correct theta, readjusting as necessary until past landing_zone_x
-      while (enes.location.x <= landing_zone_x + thresh) {
+      while (enes.location.x < landing_zone_x + thresh) {
         orient(3.14);
         //If osv is pointing in reverse direction
+        osv.driveP(-power, 200);
         updateAndPrintLocation();
-        osv.driveP(-power, 1000);
       }
 
       //orient to theta 0
@@ -108,22 +105,31 @@ void loop() {
         Moves to: Phase 2
     */
     case phase_1:
-      Serial.println("Phase 1");
-      //Update coordinate
-      //If current coordinate not within threahold values compared with center of mission area,
-      //If current x coordinate not within threshold value for mission area center
-      //turn in correct x direction facing mission area center (+x or -x)
-      //proceed along this path (maybe adjust as necessary) until within threshold of x value
-      //for mission area center OR until obstacle reached (in which case increment obstacle
-      //counter)
+      enes.println("PHASE 1");
+      
+      
+      //While current coordinate not within threahold values compared with center of mission area,
+      while (enes.location.x <= mission_center.x - thresh || enes.location.x >= mission_center.x + thresh) {
+        
+      }
+        //If current x coordinate not within threshold value for mission area center
+          //turn in correct x direction facing mission area center (+x or -x)
+          
+          //proceed along this path (maybe adjust as necessary) until within threshold of x value
+          //for mission area center OR until obstacle reached (in which case increment obstacle
+          //counter)
+          
       //If current y coordinate not within threshold value for mission area center
-      //turn in correct y direction facing mission area center (+y or -y)
-      //proceed along this path (maybe adjust as necessary) until within threshold of y value
-      //for mission area center OR until obstacle reached (in which case increment obstacle
-      //counter)
+        //turn in correct y direction facing mission area center (+y or -y)
+        
+        //proceed along this path (maybe adjust as necessary) until within threshold of y value
+        //for mission area center OR until obstacle reached (in which case increment obstacle
+        //counter)
+      
       //WHERE TO RESET COUNTER?
+      
       //If obstacle counter == 2  (OSV blocked in two directions)
-      //go around
+        //go around
 
 
       while (enes.location.x <= 2.7 + thresh) {
@@ -144,7 +150,7 @@ void loop() {
       break;
     /************************************************************************************************/
     /* SEARCH FOR BLACK BOX
-        Preconditions: OSV at center of mission area
+        Preconditions: OSV located at A) center of mission area B) with offset of INSERT in X/Y direction
         Postconditions: OSV has either completed X full rotations in search of black box IR signal,
         or has detected the black box IR signal and is facing the source.
         Notes: This phase concerns dedicated searching immediately following Phase 1.
@@ -153,10 +159,28 @@ void loop() {
     */
     case phase_2:
             
-      Serial.println("Phase 2");
-   
-      //rorate in set increments, checking IR sensor at each step
-      while ( 
+      enes.println("PHASE 2");
+
+      //record starting theta
+      starting_theta = enes.location.theta;
+      
+      //rotate in set increments, checking IR sensor at each step
+      while (counter < 2) {
+        if (irSignalCheck()) {
+          break;
+        }
+        osv.turnLeft(power);
+        delay(100);
+        osv.turnOffMotors();
+        delay(100);
+        updateAndPrintLocation();
+        
+        if (theta_sum >= (3.14 * 2)) {
+          counter++;
+          theta_sum = 0;
+        }
+        
+      }
       
       //if IR signal found, proceed to phase 3
       //else if two full rotations are completed, proceed to phase INSERT
@@ -171,7 +195,7 @@ void loop() {
     */
     
     case phase_3:
-      Serial.println("Phase 3");
+      enes.println("PHASE 3");
       break;
     /************************************************************************************************/
     /* TRANSMIT BLACK BOX COORDINATES
@@ -183,7 +207,7 @@ void loop() {
 
     
     case phase_4:
-      Serial.println("Phase 4");
+      enes.println("PHASE 4");
 
         //Verify LOS via US and IR sensors
 
@@ -201,9 +225,9 @@ void loop() {
     */
       
     case phase_5:
-      Serial.println("Phase 5");
+      enes.println("PHASE 5");
 
-      //turn OSV slightly left to accomodate off-center sensor package
+      //turn OSV slightly left to accomodate off-center sensor package: WILL NEED TO CALIBRATE VIA TESTING
     
       //acquire bb with servo-powered arm
 
@@ -218,7 +242,7 @@ void loop() {
         Moves to: N/A
     */
     case phase_6:
-      Serial.println("Phase 6");
+      enes.println("PHASE 6");
       break;
     /************************************************************************************************/
     /*
@@ -249,7 +273,7 @@ bool updateAndPrintLocation() {
 };
 
 //Returns true if black box LOS found, sets current phase to 3 (Navigate to black box)
-bool ir_signal_check() {
+bool irSignalCheck() {
   if (osv.IRsignal()){
     cur_phase = phase_3;
     return true; 
@@ -262,22 +286,45 @@ bool ir_signal_check() {
 //-3.14 <= theta <= 3.14
 void orient(double theta){
   bool success = false;
- 
+  double upper = theta + thresh, lower = theta - thresh, diff, cur;
+
+  theta = convertTheta(theta);
+  lower = convertTheta(theta - thresh);
+  upper = convertTheta(theta + thresh);
+  
+  
   while (!success) {
-    updateAndPrintLocation();
-    if (enes.location.theta < theta - angle_thresh) {
-      osv.turnLeft(power);
-      delay(100);
-      osv.turnOffMotors();
-      delay(100);
-    } else if (enes.location.theta > theta + angle_thresh) {
-      osv.turnRight(power);
-      delay(100);
-      osv.turnOffMotors();
-      delay(100);
-    } else {
-      success = true;
+    if (updateAndPrintLocation()) {
+      cur = convertTheta(enes.location.theta);
+      diff = convertTheta(theta - cur);
+  
+      if (diff < 180 && cur < lower) {
+        osv.turnLeft(power);
+        delay(100);
+        osv.turnOffMotors();
+        delay(300);
+      } else if (cur > upper) {
+        osv.turnRight(power);
+        delay(100);
+        osv.turnOffMotors();
+        delay(300);
+      } else {
+        success = true;
+      }
     }
   }
+}
+
+//convert theta to 0-(2*3.14) range of values
+double convertTheta(double theta){
+  return theta % (2*3.14);
+}
+
+// returns bool indicating if angle a is to the left of b (
+bool leftOf(double a, double b) {
+  double diff;
+
+  diff = (b - a) % (2 * 3.14);
+  diff < 3.14 ? true : false;
 }
 
