@@ -286,24 +286,18 @@ bool irSignalCheck() {
 //-3.14 <= theta <= 3.14
 void orient(double theta){
   bool success = false;
-  double upper = theta + thresh, lower = theta - thresh, diff, cur;
-
-  theta = convertTheta(theta);
-  lower = convertTheta(theta - thresh);
-  upper = convertTheta(theta + thresh);
-  
+  double diff, cur;  
   
   while (!success) {
     if (updateAndPrintLocation()) {
-      cur = convertTheta(enes.location.theta);
-      diff = convertTheta(theta - cur);
-  
-      if (diff < 180 && cur < lower) {
+      diff = angle(enes.location.theta, theta);
+      
+      if (diff < 180 && diff > thresh) {// turn left
         osv.turnLeft(power);
         delay(100);
         osv.turnOffMotors();
         delay(300);
-      } else if (cur > upper) {
+      } else if ((2 * 3.14 - diff) > thresh) {
         osv.turnRight(power);
         delay(100);
         osv.turnOffMotors();
@@ -315,16 +309,13 @@ void orient(double theta){
   }
 }
 
-//convert theta to 0-(2*3.14) range of values
-double convertTheta(double theta){
-  return theta % (2*3.14);
-}
-
-// returns bool indicating if angle a is to the left of b (
-bool leftOf(double a, double b) {
+// returns double indicating angle from a to b, clockwise (
+double angle(double a, double b) {
   double diff;
 
-  diff = (b - a) % (2 * 3.14);
-  diff < 3.14 ? true : false;
+  diff = fmod(b - a, 2 * 3.14);
+  if (diff < 0) {
+    diff += (2*3.14);
+  }
+  return diff;
 }
-
