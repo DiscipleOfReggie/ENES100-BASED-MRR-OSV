@@ -43,7 +43,7 @@ void setup() {
 
 void loop() {
   int counter = 0;
-  double starting_theta, theta_sum = 0;
+  double starting_theta, theta_sum = 0, theta_temp = 0;
   
   //Phases for panic search, default?
  
@@ -167,17 +167,22 @@ void loop() {
       //rotate in set increments, checking IR sensor at each step
       while (counter < 2) {
         if (irSignalCheck()) {
-          break;
+          break; //changing cur_phase to phase_3 covered by irSignalCheck()
         }
+        theta_temp = enes.location.theta;
         osv.turnLeft(power);
         delay(100);
         osv.turnOffMotors();
         delay(100);
         updateAndPrintLocation();
-        
+        theta_sum += theta_temp;
+        enes.print("Total angle rotated thid rotation: ");
+        enes.println(theta_sum);
         if (theta_sum >= (3.14 * 2)) {
           counter++;
           theta_sum = 0;
+          enes.print(counter);
+          enes.println(" full rotation(s) completed.");
         }
         
       }
