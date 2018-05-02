@@ -11,7 +11,7 @@ enum phase {
   phase_6  // RTB
 };
 
-const double landing_zone_x = 1.375, thresh = .5, angle_thresh = .2, obstacle_distance = 23.5;
+const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_distance = 23.5;
 
 /* Initialize osv pins
      Parameters:
@@ -25,7 +25,7 @@ const double landing_zone_x = 1.375, thresh = .5, angle_thresh = .2, obstacle_di
       int irPin
 */
 BlackBoxOSV osv(2, 4, 6, 7, 3, 10, 11, 13);
-Enes100 enes("BASED-MRR", BLACK_BOX, 41, 8, 9);
+Enes100 enes("BASED-MRR", BLACK_BOX, 19, 8, 9);
 Coordinate landing_coordinate, black_box_coordinate, mission_center(0,0,0);
 phase cur_phase;
 int power;
@@ -44,7 +44,8 @@ void setup() {
 void loop() {
   int counter = 0;
   double starting_theta, theta_sum = 0, theta_temp = 0;
-  
+  bool arrived;
+    
   //Phases for panic search, default?
  
 
@@ -89,10 +90,10 @@ void loop() {
       while (enes.location.x < landing_zone_x + thresh) {
         orient(3.14);
         //If osv is pointing in reverse direction
-        osv.driveP(-power, 200);
+        osv.driveP(-power, 400);
         updateAndPrintLocation();
       }
-
+      enes.println("EXITED LANDING AREA");
       //orient to theta 0
       orient(0);
       cur_phase = phase_1;
@@ -107,19 +108,32 @@ void loop() {
     case phase_1:
       enes.println("PHASE 1");
       
-      
+      arrived = false;
       //While current coordinate not within threahold values compared with center of mission area,
-      while (enes.location.x <= mission_center.x - thresh || enes.location.x >= mission_center.x + thresh) {
-        
-      }
+      while (!arrived) {
         //If current x coordinate not within threshold value for mission area center
+        if (enes.location.x < mission_center.x - thresh  || enes.location.x > mission_center.x + thresh) {
+          
+        } 
+        //If current y coordinate not within threshold value for mission area center
+        if (enes.location.y < mission_center.y - thresh  || enes.location.y > mission_center.y + thresh) {
+          
+        }
+        if (enes.location.x >= mission_center.x + thresh &&
+            enes.location.x <= mission_center.x - thresh &&
+            enes.location.y >= mission_center.y + thresh &&
+            enes.location.y <= mission_center.y - thresh) {
+          arrived = true;
+        }
+      }
+       
           //turn in correct x direction facing mission area center (+x or -x)
           
           //proceed along this path (maybe adjust as necessary) until within threshold of x value
           //for mission area center OR until obstacle reached (in which case increment obstacle
           //counter)
           
-      //If current y coordinate not within threshold value for mission area center
+      
         //turn in correct y direction facing mission area center (+y or -y)
         
         //proceed along this path (maybe adjust as necessary) until within threshold of y value
@@ -290,31 +304,40 @@ bool irSignalCheck() {
 //Orients OSV in angle specified by theta
 //-3.14 <= theta <= 3.14
 void orient(double theta){
-  bool success = false;
+  bool success = false, updated = false;
   double diff, cur;  
   
   while (!success) {
-    if (updateAndPrintLocation()) {
+    updated = false;
+    while(!updated){
+      if (updateAndPrintLocation()) {
+        updated = true;
+      }
+      delay(100);
+    }
+    if (updated) {
       diff = angle(enes.location.theta, theta);
-      
-      if (diff < 180 && diff > thresh) {// turn left
+      enes.print("Diff: ");
+      enes.println(diff);
+      if (diff < 3.14 && diff > angle_thresh) {// turn left
         osv.turnLeft(power);
-        delay(100);
+        delay(200);
         osv.turnOffMotors();
-        delay(300);
-      } else if ((2 * 3.14 - diff) > thresh) {
+        delay(400);
+      } else if (diff >= 3.14 && abs(diff) > angle_thresh) {// turn right
         osv.turnRight(power);
-        delay(100);
+        delay(200);
         osv.turnOffMotors();
-        delay(300);
+        delay(400);
       } else {
         success = true;
       }
     }
   }
-}
+  enes.println("Successful orient.");
+};
 
-// returns double indicating angle from a to b, clockwise (
+// returns double indicating angle from a to b, counterclockwise (
 double angle(double a, double b) {
   double diff;
 
@@ -323,4 +346,39 @@ double angle(double a, double b) {
     diff += (2*3.14);
   }
   return diff;
-}
+};
+
+// Move along axis(0 = X, 1 = Y) in dir (0 = negative, 1 = positive) until obstacle or dest coordinate reached.
+// Returns 0 if coordinate reached, 1 if obstacle blocked
+int moveInDir(int axis, int dir, double dest) {
+  double theta;
+  
+  switch (axis) {
+    case 0: // X axis
+      theta = 0? 3.14 : 0;
+
+      // while no obstacle and not inRange
+      while (!osv.obstacle(23.5) && !(inRange(enes.location.x, dest))) {
+        orient(theta);
+        osv.driveP(power, 200);
+        updateAndPrintLocation();
+      }
+      break;
+    case 1: // Y axis
+      theta = 0? (3.14) / 2 : (3.14) * 1.5;
+
+      // while no obstacle and not inRange
+      while (!osv.obstacle(23.5) && !(inRange(enes.location.y, dest))) {
+        orient(theta);
+        osv.driveP(power, 200);
+        updateAndPrintLocation();
+      }
+      break;
+  }
+};
+
+bool inRange(double cur, double dest) {
+  return (cur >= dest - thresh) && (cur <= dest + thresh);
+};
+
+
