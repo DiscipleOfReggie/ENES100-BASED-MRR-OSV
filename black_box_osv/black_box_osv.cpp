@@ -133,7 +133,7 @@ void BlackBoxOSV::driveP(int pwm,int pause) {
 bool BlackBoxOSV::obstacle(double distance) {
 	//obstcles distance=23.5cm
 	double od=this->getDistance();
-	if(od<=distance){
+	if(od <= distance){
 		return true;
 	}
 		return false;

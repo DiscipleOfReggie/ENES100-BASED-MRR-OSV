@@ -1,5 +1,6 @@
 #include <black_box_osv.h>
 #include "Enes100.h"
+#include <Servo.h>
 
 enum phase {
   phase_0, // Exit the landing zone
@@ -28,6 +29,7 @@ const int tag = 19;
 BlackBoxOSV osv(2, 4, 6, 7, 3, 10, 11, 13);
 Enes100 enes("BASED-MRR", BLACK_BOX, tag, 8, 9);
 Coordinate landing_coordinate, black_box_coordinate, mission_center(0,0,0);
+Servo myServo;
 phase cur_phase;
 int power;
 bool landing_stored, arrived;
@@ -39,7 +41,7 @@ void setup() {
   power = 255;
   landing_stored = false;
   arrived = false;
-  
+  myServo.attach(5);
 }
 
 void loop() {
@@ -65,7 +67,13 @@ void loop() {
     case phase_0:
             
       enes.println("PHASE 0");
-      
+
+      myServo.writeMicroseconds(1500);
+      delay(1000);
+      myServo.writeMicroseconds(800);
+      delay(300);
+      myServo.writeMicroseconds(1500);
+            
       //store landing coordinate
       while(!landing_stored) {
         if (updateAndPrintLocation()) {
@@ -435,4 +443,9 @@ bool blockingUpdateAndPrintLocation(){
   return updated;  
 }
 
+/*void approach(int speed, ) {
+  
+}
+}
+*/
 
