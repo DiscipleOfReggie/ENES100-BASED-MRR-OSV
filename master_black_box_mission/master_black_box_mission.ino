@@ -12,7 +12,8 @@ enum phase {
   phase_6  // RTB
 };
 
-const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_distance = 23.5;
+const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_distance = 23.5,
+             pi = 3.14159265358, two_pi = pi*2;
 const int tag = 19;
 
 /* Initialize osv pins
@@ -98,7 +99,7 @@ void loop() {
       
       //move in correct theta, readjusting as necessary until past landing_zone_x
       while (enes.location.x < landing_zone_x - thresh) {
-        orient(3.14);
+        orient(pi);
         /*
          * power 255, time 200ms, distance = 
          * d = t
@@ -108,7 +109,6 @@ void loop() {
         osv.driveP(-power, 600);
         blockingUpdateAndPrintLocation();
       }
-      osv.turnOffMotors();
       enes.println("EXITED LANDING AREA");
       //orient to theta 0
       orient(0);
@@ -206,15 +206,17 @@ void loop() {
         delay(100);
         updateAndPrintLocation();
         theta_sum += theta_temp;
-        enes.print("Total angle rotated thid rotation: ");
+        enes.print("Total angle rotated this rotation: ");
         enes.println(theta_sum);
-        if (theta_sum >= (3.14 * 2)) {
+        if (theta_sum >= (two_pi)) {
           counter++;
           theta_sum = 0;
           enes.print(counter);
           enes.println(" full rotation(s) completed.");
         }
-        
+        if (counter == 2) {
+          cur_phase = phase_7; 
+        }
       }
       
       //if IR signal found, proceed to phase 3
@@ -307,6 +309,26 @@ bool updateAndPrintLocation() {
   return success;
 };
 
+//Repeated try to update location for 15 tries
+bool blockingUpdateAndPrintLocation(){
+  bool updated = false;
+  int counter = 0;
+  
+  while(!updated && counter < 15){
+    updated = enes.updateLocation();
+    counter++;
+  }
+  if (updated) {
+    enes.print("(");
+    enes.print(enes.location.x);
+    enes.print(", ");
+    enes.print(enes.location.y);
+    enes.print("), Theta = ");
+    enes.println(enes.location.theta); 
+  }
+  return updated;  
+}
+
 //Returns true if black box LOS found, sets current phase to 3 (Navigate to black box)
 bool irSignalCheck() {
   if (osv.IRsignal()){
@@ -318,7 +340,7 @@ bool irSignalCheck() {
 };
 
 //Orients OSV in angle specified by theta
-//-3.14 <= theta <= 3.14
+//-pi <= theta <= pi
 void orient(double theta){
   bool success = false, updated = false;
   double diff, cur;  
@@ -333,7 +355,7 @@ void orient(double theta){
       diff = angle(enes.location.theta, theta);
       enes.print("Diff: ");
       enes.println(diff);
-      if (diff < 3.14 && diff > angle_thresh) {// turn left
+      if (diff < pi && diff > angle_thresh) {// turn left
         osv.turnLeft(power);
         enes.print("time ");
         enes.println((1 / 0.0015) * diff);
@@ -349,7 +371,7 @@ void orient(double theta){
          * delay()
          * osv.turnOffMotors();
          */
-      } else if (diff >= 3.14 && abs(diff) > angle_thresh) {// turn right
+      } else if (diff >= pi && abs(diff) > angle_thresh) {// turn right
         osv.turnRight(power);
         delay(min((1 / 0.0015) * diff, 800));
         osv.turnOffMotors();
@@ -367,9 +389,9 @@ void orient(double theta){
 double angle(double a, double b) {
   double diff;
 
-  diff = fmod(b - a, 2 * 3.14);
+  diff = fmod(b - a, two_pi);
   if (diff < 0) {
-    diff += (2*3.14);
+    diff += (two_pi);
   }
   return diff;
 };
@@ -381,7 +403,7 @@ int moveInDir(int axis, int dir, double dest) {
   
   switch (axis) {
     case 0: // X axis
-      theta = 0? 3.14 : 0;
+      theta = 0? pi : 0;
 
       // while no obstacle and not inRange
       while (!osv.obstacle(23.5) && !(inRange(enes.location.x, dest))) {
@@ -391,7 +413,7 @@ int moveInDir(int axis, int dir, double dest) {
       }
       break;
     case 1: // Y axis
-      theta = 0? (3.14) / 2 : (3.14) * 1.5;
+      theta = 0? (pi) / 2 : (pi) * 1.5;
 
       // while no obstacle and not inRange
       while (!osv.obstacle(23.5) && !(inRange(enes.location.y, dest))) {
@@ -431,17 +453,6 @@ void pulse(int max_power, int duration){
 
 };
 
-//Repeated try to update location for 10 tries
-bool blockingUpdateAndPrintLocation(){
-  bool updated = false;
-  int counter = 0;
-  
-  while(!updated && counter < 10){
-    updated = updateAndPrintLocation();
-    counter++;
-  }
-  return updated;  
-}
 
 /*void approach(int speed, ) {
   
