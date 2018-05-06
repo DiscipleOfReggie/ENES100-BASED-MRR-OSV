@@ -9,7 +9,8 @@ enum phase {
   phase_3, // Navigate to Black Box
   phase_4, // Transmit Black Box coordinates
   phase_5, // Secure Black Box
-  phase_6  // RTB
+  phase_6, // RTB
+  phase_7  //Adjust location to reset phase_2
 };
 
 const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_distance = 23.5,
@@ -113,6 +114,7 @@ void loop() {
       //orient to theta 0
       orient(0);
       cur_phase = phase_1;
+      irSignalCheck();
       break;
 
     /************************************************************************************************/
@@ -448,15 +450,5 @@ void pulse(int max_power, int duration){
     osv.drive(i);
     delay(segment);
   }
-
   osv.turnOffMotors();
-
 };
-
-
-/*void approach(int speed, ) {
-  
-}
-}
-*/
-
