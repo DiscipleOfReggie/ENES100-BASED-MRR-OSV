@@ -14,7 +14,7 @@ enum phase {
 };
 
 const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_dist = 22.0,
-             pi = 3.14159265358, two_pi = pi*2;
+             pi = 3.14159265358, two_pi = pi * 2;
 const int tag = 13;
 
 /* Initialize osv pins
@@ -30,7 +30,7 @@ const int tag = 13;
 */
 BlackBoxOSV osv(2, 4, 6, 7, 3, 10, 11, 13);
 Enes100 enes("BASED-MRR", BLACK_BOX, tag, 8, 9);
-Coordinate landing_coordinate, black_box_coordinate, mission_center(0,0,0);
+Coordinate landing_coordinate, black_box_coordinate, mission_center(0, 0, 0);
 Servo myServo;
 phase cur_phase;
 int power;
@@ -50,12 +50,12 @@ void loop() {
   int counter = 0;
   double starting_theta, theta_sum = 0, theta_temp = 0, angle, distance;
   bool arrived;
-    
+
   //Phases for panic search, default?
- 
+
   // update location
   updateAndPrintLocation();
-  
+
   switch (cur_phase) {
 
     /* EXIT THE LANDING ZONE
@@ -66,17 +66,17 @@ void loop() {
         Moves to: Phase 1
     */
     case phase_0:
-            
+
       enes.println("PHASE 0");
 
       myServo.writeMicroseconds(1500);
       delay(1000);
       myServo.writeMicroseconds(800);
-            
+
       //store landing coordinate
-      while(!landing_stored) {
+      while (!landing_stored) {
         if (updateAndPrintLocation()) {
-          
+
           Coordinate coor (enes.location.x, enes.location.y, enes.location.theta);
           landing_coordinate = coor;
           landing_stored = true;
@@ -94,15 +94,15 @@ void loop() {
       //check for obstacle immediately across rocky terrain?
 
       updateAndPrintLocation();
-      
+
       //move in correct theta, readjusting as necessary until past landing_zone_x
       while (enes.location.x < landing_zone_x - thresh) {
         orient(pi);
         /*
-         * power 255, time 200ms, distance = 
-         * d = t
-         * 
-         */
+           power 255, time 200ms, distance =
+           d = t
+
+        */
         //If osv is pointing in reverse direction
         osv.driveP(-power, 600);
         blockingUpdateAndPrintLocation();
@@ -124,16 +124,16 @@ void loop() {
       enes.println("PHASE 1");
 
       /*
-      arrived = false;
-      //While current coordinate not within threahold values compared with center of mission area,
-      while (!arrived) {
+        arrived = false;
+        //While current coordinate not within threahold values compared with center of mission area,
+        while (!arrived) {
         //If current x coordinate not within threshold value for mission area center
         if (enes.location.x < mission_center.x - thresh  || enes.location.x > mission_center.x + thresh) {
-          
-        } 
+
+        }
         //If current y coordinate not within threshold value for mission area center
         if (enes.location.y < mission_center.y - thresh  || enes.location.y > mission_center.y + thresh) {
-          
+
         }
         if (enes.location.x >= mission_center.x + thresh &&
             enes.location.x <= mission_center.x - thresh &&
@@ -141,8 +141,8 @@ void loop() {
             enes.location.y <= mission_center.y - thresh) {
           arrived = true;
         }
-      }
-      while (enes.location.x <= 2.7 + thresh) {
+        }
+        while (enes.location.x <= 2.7 + thresh) {
         //If osv is not at mission area center
         while (enes.location.theta <= 0 + thresh) {
           enes.updateLocation();
@@ -155,9 +155,9 @@ void loop() {
         }
         osv.driveP(power, 1000);
         enes.updateLocation();
-      }
+        }
       */
-      
+
       angle = 0.0;
       while (enes.location.x <= 2.7 + thresh) {
         //If osv is not at mission area center
@@ -178,7 +178,7 @@ void loop() {
         osv.turnRight(power);
         osv.driveP(power, 500);
       }
-      
+
       cur_phase = phase_2;
       break;
     /************************************************************************************************/
@@ -191,12 +191,12 @@ void loop() {
         Moves to: Phase 3 if successful, Phase INSERT if unsuccessful
     */
     case phase_2:
-            
+
       enes.println("PHASE 2");
 
       //record starting theta
       starting_theta = enes.location.theta;
-      
+
       //rotate in set increments, checking IR sensor at each step
       while (counter < 2) {
         //if IR signal found, proceed to phase 3
@@ -227,11 +227,11 @@ void loop() {
     /* NAVIGATE TO BLACK BOX
         Preconditions: OSV has Line Of Sight (LOS) with black box, as defined by detection of the
         IR signal by the forward-facing IR sensor
-        Postconditions: OSV has LOS with black box and is positioned within INSERT meters from the
-        black box
+        Postconditions: OSV has LOS with black box, is positioned within INSERT meters from the
+        black box, and has alerted the vision system of successful navigation.
         Moves to: Phase 4
     */
-    
+
     case phase_3:
       enes.println("PHASE 3");
 
@@ -241,24 +241,26 @@ void loop() {
         while (!arrived) {
           osv.driveP(power, 100);
           if (!osv.IRsignal()) {//signal lost
-             while (!osv.IRsignal()){
-               osv.turnLeft(power);
-               delay(50);
-               osv.turnOffMotors();
-               delay(200);
-               if(!osv.IRsignal()){
-                 osv.turnRight(power);
-               }
-               delay(50);
-               osv.turnOffMotors();
-               delay(200);
-             }
+            while (!osv.IRsignal()) {
+              osv.turnLeft(power);
+              delay(50);
+              osv.turnOffMotors();
+              delay(200);
+              if (!osv.IRsignal()) {
+                osv.turnRight(power);
+              }
+              delay(50);
+              osv.turnOffMotors();
+              delay(200);
+            }
           }
           if (osv.IRsignal() && osv.obstacle(obstacle_dist)) {
             arrived = true;
           }
         }
-      }  
+      }
+      enes.navigated();
+      cur_phase = phase_4;
       break;
     /************************************************************************************************/
     /* TRANSMIT BLACK BOX COORDINATES
@@ -268,25 +270,25 @@ void loop() {
         Moves to: Phase 5
     */
 
-    
+
     case phase_4:
       enes.println("PHASE 4");
 
-        //Verify LOS via US and IR sensors
+      //Verify LOS via US and IR sensors
 
-        //Approach black box, maintaining heading and adjusting as necessary until within THRESHOLD range as determined by US sensor
-          //if LOS lost, tun slightly in either direction to reacquire
-       
-        
-        
-        blockingUpdateAndPrintLocation();
-        distance = osv.getDistance();
-        black_box_coordinate = enes.location;
-        black_box_coordinate.x += distance * cos(enes.location.theta);
-        black_box_coordinate.y += distance * sin(enes.location.theta);
-        enes.baseObjective(black_box_coordinate);    
+      //Approach black box, maintaining heading and adjusting as necessary until within THRESHOLD range as determined by US sensor
+      //if LOS lost, tun slightly in either direction to reacquire
 
-        cur_phase = phase_5;
+
+
+      blockingUpdateAndPrintLocation();
+      distance = osv.getDistance();
+      black_box_coordinate = enes.location;
+      black_box_coordinate.x += distance * cos(enes.location.theta);
+      black_box_coordinate.y += distance * sin(enes.location.theta);
+      enes.baseObjective(black_box_coordinate);
+
+      cur_phase = phase_5;
       break;
     /************************************************************************************************/
     /* SECURE BLACK BOX
@@ -295,16 +297,16 @@ void loop() {
         Postconditions: OSV has successfully lifted black box over the sand
         Moves to: Phase 6
     */
-      
+
     case phase_5:
       enes.println("PHASE 5");
 
       //turn OSV slightly left to accomodate off-center sensor package: WILL NEED TO CALIBRATE VIA TESTING
-    
+
       //acquire bb with servo-powered arm
 
       //optional: verify bb picked up with sensors
-    
+
       break;
     /************************************************************************************************/
     /* RTB
@@ -319,6 +321,16 @@ void loop() {
       break;
     /************************************************************************************************/
     /*
+        Preconditions: Failed phase_3
+        Postconditions: OSV has moved to a new location and will restart phase_3
+    */
+    case phase_7:
+      osv.driveP(power, 600);
+      cur_phase = phase_3;
+      break;
+
+    /************************************************************************************************/
+    /*
         Preconditions: N/A
         Postconditions: N/A
     */
@@ -330,7 +342,7 @@ void loop() {
 //Updates and prints OSV coordinates
 bool updateAndPrintLocation() {
   bool success = false;
-  
+
   if (enes.updateLocation()) {
     enes.print("(");
     enes.print(enes.location.x);
@@ -346,11 +358,11 @@ bool updateAndPrintLocation() {
 };
 
 //Repeated try to update location for max tries
-bool blockingUpdateAndPrintLocation(){
+bool blockingUpdateAndPrintLocation() {
   bool updated = false;
   int counter = 0, max = 15;
-  
-  while(!updated && counter < max){
+
+  while (!updated && counter < max) {
     updated = enes.updateLocation();
     counter++;
   }
@@ -360,16 +372,16 @@ bool blockingUpdateAndPrintLocation(){
     enes.print(", ");
     enes.print(enes.location.y);
     enes.print("), Theta = ");
-    enes.println(enes.location.theta); 
+    enes.println(enes.location.theta);
   }
-  return updated;  
+  return updated;
 };
 
 //Returns true if black box LOS found, sets current phase to 3 (Navigate to black box)
 bool irSignalCheck() {
-  if (osv.IRsignal()){
+  if (osv.IRsignal()) {
     cur_phase = phase_3;
-    return true; 
+    return true;
   } else {
     return false;
   }
@@ -377,15 +389,15 @@ bool irSignalCheck() {
 
 //Orients OSV in angle specified by theta
 //-pi <= theta <= pi
-void orient(double theta){
+void orient(double theta) {
   bool success = false, updated = false;
-  double diff, cur;  
-  
+  double diff, cur;
+
   while (!success) {
     updated = false;
-    while(!updated){
+    while (!updated) {
       updated = updateAndPrintLocation();
-      
+
     }
     if (updated) {
       diff = getAngle(enes.location.theta, theta);
@@ -400,13 +412,13 @@ void orient(double theta){
         delay(400);
 
         /*
-         * power 255, 200ms... angle = .3 radians
-         * angle = .0015t
-         * t = (1/0.0015)angle
-         * osv.turnLeft(power)
-         * delay()
-         * osv.turnOffMotors();
-         */
+           power 255, 200ms... angle = .3 radians
+           angle = .0015t
+           t = (1/0.0015)angle
+           osv.turnLeft(power)
+           delay()
+           osv.turnOffMotors();
+        */
       } else if (diff >= pi && abs(diff) > angle_thresh) {// turn right
         osv.turnRight(power);
         delay(min((1 / 0.0015) * diff, 800));
@@ -436,10 +448,10 @@ double getAngle(double a, double b) {
 // Returns 0 if coordinate reached, 1 if obstacle blocked
 int moveInDir(int axis, int dir, double dest) {
   double theta;
-  
+
   switch (axis) {
     case 0: // X axis
-      theta = 0? pi : 0;
+      theta = 0 ? pi : 0;
 
       // while no obstacle and not inRange
       while (!osv.obstacle(23.5) && !(inRange(enes.location.x, dest))) {
@@ -449,7 +461,7 @@ int moveInDir(int axis, int dir, double dest) {
       }
       break;
     case 1: // Y axis
-      theta = 0? (pi) / 2 : (pi) * 1.5;
+      theta = 0 ? (pi) / 2 : (pi) * 1.5;
 
       // while no obstacle and not inRange
       while (!osv.obstacle(obstacle_dist) && !(inRange(enes.location.y, dest))) {
@@ -460,11 +472,11 @@ int moveInDir(int axis, int dir, double dest) {
       break;
 
       /*
-       * power 255, time 200ms, distance = 
-       * 
-       * 
-       * 
-       */
+         power 255, time 200ms, distance =
+
+
+
+      */
   }
 };
 
@@ -473,14 +485,14 @@ bool inRange(double cur, double dest) {
 };
 
 //Alternate drive method, variable speed within
-void pulse(int max_power, int duration){
-  int i, segment = duration/max_power;
-  
-  for (i = 0; i < max_power; i++){
+void pulse(int max_power, int duration) {
+  int i, segment = duration / max_power;
+
+  for (i = 0; i < max_power; i++) {
     osv.drive(i);
     delay(segment);
   }
-  for (i = max_power; i >= 0; i++){
+  for (i = max_power; i >= 0; i++) {
     osv.drive(i);
     delay(segment);
   }
