@@ -13,9 +13,9 @@ enum phase {
   phase_7  //Adjust location to reset phase_2
 };
 
-const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_distance = 23.5,
+const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_dist = 22.0,
              pi = 3.14159265358, two_pi = pi*2;
-const int tag = 19;
+const int tag = 13;
 
 /* Initialize osv pins
      Parameters:
@@ -40,7 +40,7 @@ void setup() {
   Serial.begin(9600);
   osv.init();
   cur_phase = phase_0;
-  power = 255;
+  power = 220;
   landing_stored = false;
   arrived = false;
   myServo.attach(5);
@@ -48,12 +48,11 @@ void setup() {
 
 void loop() {
   int counter = 0;
-  double starting_theta, theta_sum = 0, theta_temp = 0;
+  double starting_theta, theta_sum = 0, theta_temp = 0, angle, distance;
   bool arrived;
     
   //Phases for panic search, default?
  
-
   // update location
   updateAndPrintLocation();
   
@@ -73,8 +72,6 @@ void loop() {
       myServo.writeMicroseconds(1500);
       delay(1000);
       myServo.writeMicroseconds(800);
-      delay(300);
-      myServo.writeMicroseconds(1500);
             
       //store landing coordinate
       while(!landing_stored) {
@@ -125,7 +122,8 @@ void loop() {
     */
     case phase_1:
       enes.println("PHASE 1");
-      
+
+      /*
       arrived = false;
       //While current coordinate not within threahold values compared with center of mission area,
       while (!arrived) {
@@ -144,26 +142,6 @@ void loop() {
           arrived = true;
         }
       }
-       
-          //turn in correct x direction facing mission area center (+x or -x)
-          
-          //proceed along this path (maybe adjust as necessary) until within threshold of x value
-          //for mission area center OR until obstacle reached (in which case increment obstacle
-          //counter)
-          
-      
-        //turn in correct y direction facing mission area center (+y or -y)
-        
-        //proceed along this path (maybe adjust as necessary) until within threshold of y value
-        //for mission area center OR until obstacle reached (in which case increment obstacle
-        //counter)
-      
-      //WHERE TO RESET COUNTER?
-      
-      //If obstacle counter == 2  (OSV blocked in two directions)
-        //go around
-
-
       while (enes.location.x <= 2.7 + thresh) {
         //If osv is not at mission area center
         while (enes.location.theta <= 0 + thresh) {
@@ -178,7 +156,30 @@ void loop() {
         osv.driveP(power, 1000);
         enes.updateLocation();
       }
+      */
+      
+      angle = 0.0;
+      while (enes.location.x <= 2.7 + thresh) {
+        //If osv is not at mission area center
+        if (enes.location.y <= 1 + thresh || enes.location.y >= 1 - thresh) {
+          osv.driveP(power, 500);
+        } else {
+          angle = ((atan((2.7 - enes.location.x) / (abs(enes.location.y - 1)))) / (180)) * 3.14;
+          if (enes.location.y > 1) {
+            orient(1.57 - angle);
+          } else {
+            orient(abs(1.57 - angle));
+          }
+        }
+        osv.driveP(power, 500);
+      }
 
+      while (osv.obstacle(obstacle_dist)) {
+        osv.turnRight(power);
+        osv.driveP(power, 500);
+      }
+      
+      cur_phase = phase_2;
       break;
     /************************************************************************************************/
     /* SEARCH FOR BLACK BOX
@@ -198,6 +199,7 @@ void loop() {
       
       //rotate in set increments, checking IR sensor at each step
       while (counter < 2) {
+        //if IR signal found, proceed to phase 3
         if (irSignalCheck()) {
           break; //changing cur_phase to phase_3 covered by irSignalCheck()
         }
@@ -217,24 +219,46 @@ void loop() {
           enes.println(" full rotation(s) completed.");
         }
         if (counter == 2) {
-          cur_phase = phase_7; 
+          cur_phase = phase_7; //Search failed
         }
       }
-      
-      //if IR signal found, proceed to phase 3
-      //else if two full rotations are completed, proceed to phase INSERT
       break;
     /************************************************************************************************/
     /* NAVIGATE TO BLACK BOX
         Preconditions: OSV has Line Of Sight (LOS) with black box, as defined by detection of the
         IR signal by the forward-facing IR sensor
-        Postconditions: OSV has LOS with black box and is positioned INSERT meters from the
+        Postconditions: OSV has LOS with black box and is positioned within INSERT meters from the
         black box
         Moves to: Phase 4
     */
     
     case phase_3:
       enes.println("PHASE 3");
+
+      if (!osv.IRsignal()) {//Verify IR signal
+        cur_phase = phase_3;
+      } else {
+        while (!arrived) {
+          osv.driveP(power, 100);
+          if (!osv.IRsignal()) {//signal lost
+             while (!osv.IRsignal()){
+               osv.turnLeft(power);
+               delay(50);
+               osv.turnOffMotors();
+               delay(200);
+               if(!osv.IRsignal()){
+                 osv.turnRight(power);
+               }
+               delay(50);
+               osv.turnOffMotors();
+               delay(200);
+             }
+          }
+          if (osv.IRsignal() && osv.obstacle(obstacle_dist)) {
+            arrived = true;
+          }
+        }
+      }  
       break;
     /************************************************************************************************/
     /* TRANSMIT BLACK BOX COORDINATES
@@ -252,8 +276,17 @@ void loop() {
 
         //Approach black box, maintaining heading and adjusting as necessary until within THRESHOLD range as determined by US sensor
           //if LOS lost, tun slightly in either direction to reacquire
+       
+        
+        
+        blockingUpdateAndPrintLocation();
+        distance = osv.getDistance();
+        black_box_coordinate = enes.location;
+        black_box_coordinate.x += distance * cos(enes.location.theta);
+        black_box_coordinate.y += distance * sin(enes.location.theta);
+        enes.baseObjective(black_box_coordinate);    
 
-      
+        cur_phase = phase_5;
       break;
     /************************************************************************************************/
     /* SECURE BLACK BOX
@@ -282,6 +315,7 @@ void loop() {
     */
     case phase_6:
       enes.println("PHASE 6");
+      enes.endMission();
       break;
     /************************************************************************************************/
     /*
@@ -311,12 +345,12 @@ bool updateAndPrintLocation() {
   return success;
 };
 
-//Repeated try to update location for 15 tries
+//Repeated try to update location for max tries
 bool blockingUpdateAndPrintLocation(){
   bool updated = false;
-  int counter = 0;
+  int counter = 0, max = 15;
   
-  while(!updated && counter < 15){
+  while(!updated && counter < max){
     updated = enes.updateLocation();
     counter++;
   }
@@ -329,7 +363,7 @@ bool blockingUpdateAndPrintLocation(){
     enes.println(enes.location.theta); 
   }
   return updated;  
-}
+};
 
 //Returns true if black box LOS found, sets current phase to 3 (Navigate to black box)
 bool irSignalCheck() {
@@ -354,14 +388,14 @@ void orient(double theta){
       
     }
     if (updated) {
-      diff = angle(enes.location.theta, theta);
+      diff = getAngle(enes.location.theta, theta);
       enes.print("Diff: ");
       enes.println(diff);
       if (diff < pi && diff > angle_thresh) {// turn left
         osv.turnLeft(power);
         enes.print("time ");
         enes.println((1 / 0.0015) * diff);
-        delay(min((1 / 0.0015) * diff, 800));
+        delay(min((1 / 0.003) * diff, 500));
         osv.turnOffMotors();
         delay(400);
 
@@ -388,7 +422,7 @@ void orient(double theta){
 };
 
 // returns double indicating angle from a to b, counterclockwise (
-double angle(double a, double b) {
+double getAngle(double a, double b) {
   double diff;
 
   diff = fmod(b - a, two_pi);
@@ -418,7 +452,7 @@ int moveInDir(int axis, int dir, double dest) {
       theta = 0? (pi) / 2 : (pi) * 1.5;
 
       // while no obstacle and not inRange
-      while (!osv.obstacle(23.5) && !(inRange(enes.location.y, dest))) {
+      while (!osv.obstacle(obstacle_dist) && !(inRange(enes.location.y, dest))) {
         orient(theta);
         osv.driveP(power, 200);
         updateAndPrintLocation();
