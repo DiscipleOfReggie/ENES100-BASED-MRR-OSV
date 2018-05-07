@@ -15,7 +15,7 @@ enum phase {
 
 const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_dist = 22.0,
              pi = 3.14159265358, two_pi = pi * 2;
-const int tag = 13;
+const int tag = 19, power = 255;
 
 /* Initialize osv pins
      Parameters:
@@ -30,20 +30,23 @@ const int tag = 13;
 */
 BlackBoxOSV osv(2, 4, 6, 7, 3, 10, 11, 13);
 Enes100 enes("BASED-MRR", BLACK_BOX, tag, 8, 9);
-Coordinate landing_coordinate, black_box_coordinate, mission_center(0, 0, 0);
+Coordinate landing_coordinate, black_box_coordinate, mission_center(1, 2.7);
 Servo myServo;
 phase cur_phase;
-int power;
 bool landing_stored, arrived;
 
 void setup() {
   Serial.begin(9600);
   osv.init();
   cur_phase = phase_0;
-  power = 220;
   landing_stored = false;
   arrived = false;
   myServo.attach(5);
+  //Lock servo arm upright
+  myServo.writeMicroseconds(1500);
+  delay(1000);
+  myServo.writeMicroseconds(800);
+
 }
 
 void loop() {
@@ -51,10 +54,9 @@ void loop() {
   double starting_theta, theta_sum = 0, theta_temp = 0, angle, distance;
   bool arrived;
 
-  //Phases for panic search, default?
 
   // update location
-  updateAndPrintLocation();
+  //updateAndPrintLocation();
 
   switch (cur_phase) {
 
@@ -67,11 +69,7 @@ void loop() {
     */
     case phase_0:
 
-      enes.println("PHASE 0");
-
-      myServo.writeMicroseconds(1500);
-      delay(1000);
-      myServo.writeMicroseconds(800);
+      enes.println("--------PHASE 0--------");
 
       //store landing coordinate
       while (!landing_stored) {
@@ -112,6 +110,7 @@ void loop() {
       orient(0);
       cur_phase = phase_1;
       irSignalCheck();
+      enes.println("Moving to phase 1");
       break;
 
     /************************************************************************************************/
@@ -121,7 +120,7 @@ void loop() {
         Moves to: Phase 2
     */
     case phase_1:
-      enes.println("PHASE 1");
+      enes.println("--------PHASE 1--------");
 
       /*
         arrived = false;
@@ -159,27 +158,32 @@ void loop() {
       */
 
       angle = 0.0;
-      while (enes.location.x <= 2.7 + thresh) {
+      while (enes.location.x <= mission_center.x - thresh && (!osv.obstacle(obstacle_dist))) {
         //If osv is not at mission area center
-        if (enes.location.y <= 1 + thresh || enes.location.y >= 1 - thresh) {
-          osv.driveP(power, 500);
+        if (enes.location.y <= mission_center.y + thresh || enes.location.y >= mission_center.y - thresh) {
+          osv.driveP(power, 300);
+          updateAndPrintLocation();
         } else {
-          angle = ((atan((2.7 - enes.location.x) / (abs(enes.location.y - 1)))) / (180)) * 3.14;
-          if (enes.location.y > 1) {
+          angle = ((atan((mission_center.x - enes.location.x) / (abs(enes.location.y - mission_center.y)))) / (180)) * 3.14;
+          if (enes.location.y > mission_center.y) {
             orient(1.57 - angle);
           } else {
             orient(abs(1.57 - angle));
           }
         }
         osv.driveP(power, 500);
+        updateAndPrintLocation();
       }
 
       while (osv.obstacle(obstacle_dist)) {
         osv.turnRight(power);
         osv.driveP(power, 500);
+        updateAndPrintLocation();
       }
-
-      cur_phase = phase_2;
+      if (enes.location.x > mission_center.x - thresh && (!osv.obstacle(obstacle_dist))) {
+        cur_phase = phase_2;
+        break;
+      }
       break;
     /************************************************************************************************/
     /* SEARCH FOR BLACK BOX
@@ -192,7 +196,7 @@ void loop() {
     */
     case phase_2:
 
-      enes.println("PHASE 2");
+      enes.println("--------PHASE 2--------");
 
       //record starting theta
       starting_theta = enes.location.theta;
@@ -207,7 +211,7 @@ void loop() {
         osv.turnLeft(power);
         delay(100);
         osv.turnOffMotors();
-        delay(100);
+        delay(200);
         updateAndPrintLocation();
         theta_sum += theta_temp;
         enes.print("Total angle rotated this rotation: ");
@@ -233,13 +237,14 @@ void loop() {
     */
 
     case phase_3:
-      enes.println("PHASE 3");
+      enes.println("--------PHASE 3--------");
 
       if (!osv.IRsignal()) {//Verify IR signal
         cur_phase = phase_3;
       } else {
         while (!arrived) {
           osv.driveP(power, 100);
+          delay(400);
           if (!osv.IRsignal()) {//signal lost
             while (!osv.IRsignal()) {
               osv.turnLeft(power);
@@ -249,7 +254,7 @@ void loop() {
               if (!osv.IRsignal()) {
                 osv.turnRight(power);
               }
-              delay(50);
+              delay(100);
               osv.turnOffMotors();
               delay(200);
             }
@@ -272,10 +277,13 @@ void loop() {
 
 
     case phase_4:
-      enes.println("PHASE 4");
+      enes.println("--------PHASE 4--------");
 
-      //Verify LOS via US and IR sensors
-
+      //Verify LOS via IR sensors
+      if (osv.IRsignal()) {
+        cur_phase = phase_3;
+        break;
+      }
       //Approach black box, maintaining heading and adjusting as necessary until within THRESHOLD range as determined by US sensor
       //if LOS lost, tun slightly in either direction to reacquire
 
@@ -299,13 +307,19 @@ void loop() {
     */
 
     case phase_5:
-      enes.println("PHASE 5");
-
-      //turn OSV slightly left to accomodate off-center sensor package: WILL NEED TO CALIBRATE VIA TESTING
-
+      enes.println("--------PHASE 5--------");
+      if (osv.IRsignal()) {
+        cur_phase = phase_3;
+        break;
+      } else {
+        osv.driveP(power, 300);
+      }
       //acquire bb with servo-powered arm
+      myServo.writeMicroseconds(1600);
+      delay(5000);
+      myServo.writeMicroseconds(1500);                  // Stop 1500
+      cur_phase = phase_6;
 
-      //optional: verify bb picked up with sensors
 
       break;
     /************************************************************************************************/
@@ -316,7 +330,13 @@ void loop() {
         Moves to: N/A
     */
     case phase_6:
-      enes.println("PHASE 6");
+      enes.println("--------PHASE 6--------");
+
+      while (enes.location.x > landing_zone_x + thresh) {
+        orient(0);
+        osv.driveP(-power, 200);
+        updateAndPrintLocation();
+      }
       enes.endMission();
       break;
     /************************************************************************************************/
@@ -325,6 +345,7 @@ void loop() {
         Postconditions: OSV has moved to a new location and will restart phase_3
     */
     case phase_7:
+
       osv.driveP(power, 600);
       cur_phase = phase_3;
       break;
@@ -335,9 +356,18 @@ void loop() {
         Postconditions: N/A
     */
     default:
+      enes.println("--------PHASE 7--------");
+      //PANIC!
       break;
   }
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//HELPER METHODS
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 //Updates and prints OSV coordinates
 bool updateAndPrintLocation() {
@@ -365,6 +395,8 @@ bool blockingUpdateAndPrintLocation() {
   while (!updated && counter < max) {
     updated = enes.updateLocation();
     counter++;
+    enes.print("Try number");
+    enes.println(counter);
   }
   if (updated) {
     enes.print("(");
@@ -379,10 +411,23 @@ bool blockingUpdateAndPrintLocation() {
 
 //Returns true if black box LOS found, sets current phase to 3 (Navigate to black box)
 bool irSignalCheck() {
-  if (osv.IRsignal()) {
+  int counter = 0, max = 20;
+  bool found = false;
+  
+  enes.println("Checking IR");
+
+  while (!found && counter < max) {
+      counter++;
+      found = osv.IRsignal();
+      delay(20);
+  }
+  if (found) {
     cur_phase = phase_3;
+    enes.println("FOUND");
     return true;
+    
   } else {
+    enes.println("NOT FOUND");
     return false;
   }
 };
@@ -397,7 +442,6 @@ void orient(double theta) {
     updated = false;
     while (!updated) {
       updated = updateAndPrintLocation();
-
     }
     if (updated) {
       diff = getAngle(enes.location.theta, theta);
