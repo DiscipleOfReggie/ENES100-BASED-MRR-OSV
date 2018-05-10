@@ -13,9 +13,9 @@ enum phase {
   phase_7  //Adjust location to reset phase_2
 };
 
-const double landing_zone_x = 1.375, thresh = .2, angle_thresh = .2, obstacle_dist = 22.0,
+const double landing_zone_x = 1.475, thresh = .2, angle_thresh = .2, obstacle_dist = 22.0,
              pi = 3.14159265358, two_pi = pi * 2;
-const int tag = 19, power = 255;
+const int tag = 31, power = 255;
 
 /* Initialize osv pins
      Parameters:
@@ -102,7 +102,7 @@ void loop() {
 
         */
         //If osv is pointing in reverse direction
-        osv.driveP(-power, 600);
+        osv.driveP(-power + 20, 600);
         blockingUpdateAndPrintLocation();
       }
       enes.println("EXITED LANDING AREA");
@@ -161,7 +161,7 @@ void loop() {
       while (enes.location.x <= mission_center.x - thresh && (!osv.obstacle(obstacle_dist))) {
         //If osv is not at mission area center
         if (enes.location.y <= mission_center.y + thresh || enes.location.y >= mission_center.y - thresh) {
-          osv.driveP(power, 300);
+          osv.driveP(power - 20, 300);
           updateAndPrintLocation();
         } else {
           angle = ((atan((mission_center.x - enes.location.x) / (abs(enes.location.y - mission_center.y)))) / (180)) * 3.14;
@@ -171,13 +171,13 @@ void loop() {
             orient(abs(1.57 - angle));
           }
         }
-        osv.driveP(power, 500);
+        osv.driveP(power - 20, 500);
         updateAndPrintLocation();
       }
 
       while (osv.obstacle(obstacle_dist)) {
         osv.turnRight(power);
-        osv.driveP(power, 500);
+        osv.driveP(power - 20, 500);
         updateAndPrintLocation();
       }
       if (enes.location.x > mission_center.x - thresh && (!osv.obstacle(obstacle_dist))) {
@@ -243,7 +243,7 @@ void loop() {
         cur_phase = phase_3;
       } else {
         while (!arrived) {
-          osv.driveP(power, 100);
+          osv.driveP(power - 20, 100);
           delay(400);
           if (!osv.IRsignal()) {//signal lost
             while (!osv.IRsignal()) {
@@ -312,7 +312,7 @@ void loop() {
         cur_phase = phase_3;
         break;
       } else {
-        osv.driveP(power, 300);
+        osv.driveP(power - 20, 300);
       }
       //acquire bb with servo-powered arm
       myServo.writeMicroseconds(1600);
@@ -334,7 +334,7 @@ void loop() {
 
       while (enes.location.x > landing_zone_x + thresh) {
         orient(0);
-        osv.driveP(-power, 200);
+        osv.driveP(-power + 20, 200);
         updateAndPrintLocation();
       }
       enes.endMission();
@@ -346,7 +346,7 @@ void loop() {
     */
     case phase_7:
 
-      osv.driveP(power, 600);
+      osv.driveP(power - 20, 600);
       cur_phase = phase_3;
       break;
 
@@ -500,7 +500,7 @@ int moveInDir(int axis, int dir, double dest) {
       // while no obstacle and not inRange
       while (!osv.obstacle(23.5) && !(inRange(enes.location.x, dest))) {
         orient(theta);
-        osv.driveP(power, 200);
+        osv.driveP(power - 20, 200);
         updateAndPrintLocation();
       }
       break;
@@ -510,7 +510,7 @@ int moveInDir(int axis, int dir, double dest) {
       // while no obstacle and not inRange
       while (!osv.obstacle(obstacle_dist) && !(inRange(enes.location.y, dest))) {
         orient(theta);
-        osv.driveP(power, 200);
+        osv.driveP(power - 20, 200);
         updateAndPrintLocation();
       }
       break;
